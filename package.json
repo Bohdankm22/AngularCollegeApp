@@ -26,7 +26,7 @@
     "core-js": "2.4.1",
     "compression": "1.6.0",
     "connect-flash": "0.1.1",
-    "ejs": "^2.5.8",
+    "ejs": "2.5.2",
     "express": "4.14.0",
     "express-session": "1.14.1",
     "method-override": "2.3.6",
@@ -46,6 +46,6 @@
     "concurrently": "3.1.0",
     "traceur": "0.0.111",
     "typescript": "2.0.3",
-    "typings": "^2.1.1"
+    "typings": "1.4.0"
   }
 }

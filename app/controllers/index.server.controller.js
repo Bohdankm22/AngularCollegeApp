@@ -1,34 +1,15 @@
-// Create a new 'render' controller method
-exports.render = function(req, res) {
-	// If the session's 'lastVisit' property is set, print it out in the console 
-	if (req.session.lastVisit) {
-		console.log(req.session.lastVisit);
-	}
+﻿// Create a new 'render' controller method
+exports.render = function (req, res) {
+    // Set the safe user object 
+    const user = (!req.user) ? null : {
+        _id: req.user.id,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName
+    };
 
-	// Set the session's 'lastVisit' property
-	req.session.lastVisit = new Date();
-
-	// Use the 'response' object to render the 'index' view with a 'title' property
-	res.render('index', {
-		title: 'CRUD Operations using Mongoose'
-	});
-};
-
-exports.renderAddUser = function (req, res) {
-    
-    // Use the 'response' object to render the 'add_user' view with a 'title' property
-    res.render('add_user', {
-        title: 'Add User'
+    // Use the 'response' object to render the 'index' view with a 'title' and 'user' properties
+    res.render('index', {
+        title: 'Hello World',
+        user: JSON.stringify(user)
     });
-    //you may also render an html form
-    //res.render('add_user.html');
-};
-
-exports.renderReadUser = function (req, res) {
-
-    // Use the 'response' object to render the 'read_user' view with a 'title' property
-    res.render('read_user', {
-        title: 'Read user by username'
-    });
-    
 };

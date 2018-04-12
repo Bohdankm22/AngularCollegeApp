@@ -1,184 +1,140 @@
-// Load the 'User' Mongoose model
+﻿// Load the module dependencies
 const User = require('mongoose').model('User');
+const passport = require('passport');
 
-// 'create' controller method to create a new user
-exports.create = function(req, res, next) {
-	// Create a new instance of the 'User' Mongoose model
-	const user = new User(req.body);
+// Create a new error handling controller method
+const getErrorMessage = function (err) {
+    // Define the error message variable
+    let message = '';
 
-	// Use the 'User' instance's 'save' method to save a new user document
-	user.save((err) => {
-		if (err) {
-			// Call the next middleware with an error message
-			return next(err);
-		} else {
-			// Use the 'response' object to send a JSON response
-			res.json(user);
-		}
-	});
+    // If an internal MongoDB error occurs get the error message
+    if (err.code) {
+        switch (err.code) {
+            // If a unique index error occurs set the message error
+            case 11000:
+            case 11001:
+                message = 'Username already exists';
+                break;
+            // If a general error occurs set the message error
+            default:
+                message = 'Something went wrong';
+        }
+    } else {
+        // Grab the first error message from a list of possible errors
+        for (const errName in err.errors) {
+            if (err.errors[errName].message) message = err.errors[errName].message;
+        }
+    }
+
+    // Return the message error
+    return message;
 };
 
-// 'list' controller method to display all users in raw json format
-exports.list = function(req, res, next) {
-	// Use the 'User' static 'find' method to retrieve the list of users
-	User.find({}, (err, users) => {
-		if (err) {
-			// Call the next middleware with an error message
-			return next(err);
-		} else {
-			// Use the 'response' object to send a JSON response
-			res.json(users);
-		}
-	});
-};
-
-// 'display' controller method to display all users in friendly format
-exports.display = function (req, res, next) {
-    // Use the 'User' static 'find' method to retrieve the list of users
-    User.find({}, (err, users) => {
-        if (err) {
-            // Call the next middleware with an error message
-            return next(err);
+// Create a new controller method that signin users
+exports.signin = function (req, res, next) {
+    passport.authenticate('local', (err, user, info) => {
+        if (err || !user) {
+            res.status(400).send(info);
         } else {
-            // Use the 'response' object to send a JSON response
-            res.render('listall', {
-                title: 'List All Users',
-                users: users
+            // Remove sensitive data before login
+            user.password = undefined;
+            user.salt = undefined;
+
+            // Use the Passport 'login' method to login
+            req.login(user, (err) => {
+                if (err) {
+                    res.status(400).send(err);
+                } else {
+                    res.json(user);
+                }
+            });
+        }
+    })(req, res, next);
+};
+
+// Create a new controller method that creates new 'regular' users
+exports.signup = function (req, res) {
+    const user = new User(req.body);
+    user.provider = 'local';
+
+    // Try saving the User
+    user.save((err) => {
+        if (err) {
+            return res.status(400).send({
+                message: getErrorMessage(err)
+            });
+        } else {
+            // Remove sensitive data before login
+            user.password = undefined;
+            user.salt = undefined;
+
+            // Login the user
+            req.login(user, function (err) {
+                if (err) {
+                    res.status(400).send(err);
+                } else {
+                    res.json(user);
+                }
             });
         }
     });
+}
+
+// Create a new controller method that creates new 'OAuth' users
+exports.saveOAuthUserProfile = function (req, profile, done) {
+    // Try finding a user document that was registered using the current OAuth provider
+    User.findOne({
+        provider: profile.provider,
+        providerId: profile.providerId
+    }, (err, user) => {
+        // If an error occurs continue to the next middleware
+        if (err) {
+            return done(err);
+        } else {
+            // If a user could not be found, create a new user, otherwise, continue to the next middleware
+            if (!user) {
+                // Set a possible base username
+                const possibleUsername = profile.username || ((profile.email) ? profile.email.split('@')[0] : '');
+
+                // Find a unique available username
+                User.findUniqueUsername(possibleUsername, null, (availableUsername) => {
+                    // Set the available user name 
+                    profile.username = availableUsername;
+
+                    // Create the user
+                    user = new User(profile);
+
+                    // Try saving the new user document
+                    user.save(function (err) {
+                        // Continue to the next middleware
+                        return done(err, user);
+                    });
+                });
+            } else {
+                // Continue to the next middleware
+                return done(err, user);
+            }
+        }
+    });
+};
+
+// Create a new controller method for signing out
+exports.signout = function (req, res) {
+    // Use the Passport 'logout' method to logout
+    req.logout();
+
+    // Redirect the user back to the main application page
+    res.redirect('/');
+};
+//uses the Passport-initiated req.
+//isAuthenticated() method to check whether a user is currently authenticated
+exports.requiresLogin = function (req, res, next) {
+    if (!req.isAuthenticated()) {
+        return res.status(401).send({
+            message: 'User is not logged in'
+        });
+    }
+    next();
 };
 //
-// 'display' controller method to display all users in friendly format
-exports.showDeletePage = function (req, res) {
-    
-    // Use the 'response' object to show the delete_user page
-    res.render('delete_user', {
-        title: 'Delete User' });
-        
-};
 
-// 'read' controller method to display a user
-exports.read = function(req, res) {
-	// Use the 'response' object to send a JSON response
-	res.json(req.user);
-};
-
-// 'update' controller method to update a user based on id
-exports.update = function (req, res, next) {
-    req.user=req.body //read the user from request's body
-    console.log(req.user)
-	// Use the 'User' static 'findByIdAndUpdate' method to update a specific user
-	User.findByIdAndUpdate(req.user.id, req.body, (err, user) => {
-		if (err) {
-			// Call the next middleware with an error message
-			return next(err);
-		} else {
-			// Use the 'response' object to send a JSON response
-			//res.json(user);
-            res.redirect('/users') //display all users
-		}
-	})
-};
-
-//update a user by username
-exports.updateByUsername = function (req, res, next) {
-    req.user = req.body //read the user from request's body
-    console.log(req.user)
-    //initialize findOneAndUpdate method arguments
-    var query = { "username": req.user.username };
-    var update = req.body;
-    var options = { new: true };
-
-    // Use the 'User' static 'findOneAndUpdate' method to update a specific user by user name
-    User.findOneAndUpdate(query, update, options, (err, user) => {
-        if (err) {
-            // Call the next middleware with an error message
-            return next(err);
-        } else {
-            // Use the 'response' object to send a JSON response
-            //res.json(user);
-            res.redirect('/users') //display all users
-        }
-    })
-};
-
-
-// 'delete' controller method to delete a user
-exports.delete = function(req, res, next) {
-	// Use the 'User' instance's 'remove' method to delete user document
-	req.user.remove((err) => {
-		if (err) {
-			// Call the next middleware with an error message
-			return next(err);
-		} else {
-			// Use the 'response' object to send a JSON response
-			res.json(req.user);
-		}
-	})
-};
-
-//delete user by username
-exports.deleteByUserName = function (req, res, next) {
-    //
-    console.log(req.body.username);
-    User.findOneAndRemove({
-        username: req.body.username
-    }, function (err, user) {
-
-        if (err) throw err;
-
-        console.log("Success");
-
-    });
-
-    res.redirect('/display');
-
-
-};
-// 'userByID' controller method to find a user by its id or username
-//  the code is using the username field instead of id
-exports.userByID = function (req, res, next, username) {
-	// Use the 'User' static 'findOne' method to retrieve a specific user
-	User.findOne({
-		username: username //using the username instead of id
-	}, (err, user) => {
-		if (err) {
-			// Call the next middleware with an error message
-			return next(err);
-		} else {
-			// Set the 'req.user' property
-            req.user = user;
-            console.log(user);
-			// Call the next middleware
-			next();
-		}
-	});
-};
-
-// 'userByUsername' controller method to find a user by its username
-// and display the result in edit.ejs file
-exports.userByUsername = function (req, res, next) {
-    // Use the 'User' static 'findOne' method to retrieve a specific user
-    var username = req.body.username;
-    console.log(username)
-    User.findOne({
-        username: username //finding a document by username
-    }, (err, user) => {
-        if (err) {
-            // Call the next middleware with an error message
-            return next(err);
-        } else {
-            // Set the 'req.user' property
-            req.user = user;
-            //parse it to a JSON object
-            var jsonUser = JSON.parse(JSON.stringify(user));
-            console.log(jsonUser)
-            //display edit page and pass user properties to it
-            res.render('edit', { title: 'Edit user', user: jsonUser} );
-
-            // Call the next middleware
-            next();
-        }
-    });
-};
