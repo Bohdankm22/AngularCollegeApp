@@ -5,16 +5,9 @@ const Schema = mongoose.Schema;
 // Define a new 'UserSchema'
 const StudentSchema = new Schema({
     studentNumber: String,
-    password: {
-        type: String,
-        // Validate the 'password' value length
-        validate: [
-            (password) => password.length >= 6,
-        'Password Should Be Longer'
-        ]
-    },
     firstName: String,
-    lastName: String, address: String,
+    lastName: String,
+    address: String,
     city: String,
     phoneNumber:String,
     email: {
@@ -24,7 +17,15 @@ const StudentSchema = new Schema({
         // Validate the email format
         match: /.+\@.+\..+/
     },
-    program: String
+    program: String,
+    password: {
+        type: String,
+        // Validate the 'password' value length
+        validate: [
+            (password) => password.length >= 6,
+        'Password Should Be Longer'
+        ]
+    }
 });
 
 // Set the 'fullname' virtual property
